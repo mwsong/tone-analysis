@@ -283,7 +283,7 @@ def inter_speaker_alignment(h_A, h_B):
     """
     sims = []
     for i in range(len(h_A)-1):
-        sims.append(cosine_similarity(h_A[i], h_B[i+1]))
+        sims.append(cosine_similarity(h_A[i], h_B[i]))
     return sims
 
 def cross_speaker_delta(deltas_A, deltas_B):
@@ -295,7 +295,7 @@ def cross_speaker_delta(deltas_A, deltas_B):
     """
     dirs = []
     for i in range(len(deltas_A)-1):
-        dirs.append(cosine_similarity(deltas_A[i], deltas_B[i+1]))
+        dirs.append(cosine_similarity(deltas_A[i], deltas_B[i]))
     return dirs
 
 def amplification(deltas_A, deltas_B):
@@ -306,7 +306,7 @@ def amplification(deltas_A, deltas_B):
     amps = []
     for i in range(len(deltas_A)-1):
         norm_A = torch.norm(deltas_A[i])
-        norm_B = torch.norm(deltas_B[i+1])
+        norm_B = torch.norm(deltas_B[i])
         amps.append((norm_B / norm_A).item())
     return amps
 
@@ -332,22 +332,13 @@ def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
     deltas_B = compute_self_deltas(h_B)
 
     # inter-speaker alignment
-    sim_AB = [
-        cosine_similarity(h_A[i], h_B[i+1])
-        for i in range(min(len(h_A)-1, len(h_B)-1))
-    ]
+    sim_AB = inter_speaker_alignment(h_A, h_B)
 
     # contagion
-    dir_AB = [
-        cosine_similarity(deltas_A[i], deltas_B[i+1])
-        for i in range(min(len(deltas_A)-1, len(deltas_B)-1))
-    ]
+    dir_AB = cross_speaker_delta(deltas_A, deltas_B)
 
     # amplification
-    amp_AB = [
-        (torch.norm(deltas_B[i+1]) / torch.norm(deltas_A[i])).item()
-        for i in range(min(len(deltas_A)-1, len(deltas_B)-1))
-    ]
+    amp_AB = amplification(deltas_A, deltas_B)
 
     # emotional inertia
     inertia_A = autocorr(h_A)
