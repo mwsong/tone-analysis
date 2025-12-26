@@ -225,6 +225,29 @@ def plot_metric(metric_list, speaker_name, scene_name="Scene", ylabel="Value"):
     plt.legend()
     plt.show()
 
+def plot_all_layers(emotional_dict, scene_name="Scene"):
+    for layer_name, data in emotional_dict.items():
+        if isinstance(data, dict):
+            for speaker, metric_list in data.items():
+                # If it's deltas (list of tensors), convert to norms first
+                if layer_name in ["layer1_deltas"]:
+                    metric_list = [torch.norm(d).item() for d in metric_list]
+                
+                plot_metric(
+                    metric_list,
+                    speaker_name=speaker,
+                    scene_name=scene_name,
+                    ylabel=layer_name
+                )
+        else:
+            plot_metric(
+                data,
+                speaker_name=layer_name,
+                scene_name=scene_name,
+                ylabel=layer_name
+            )
+
+
 
 #----------------------
 #emotional trajectory analysis layers: functions !!
@@ -291,9 +314,55 @@ def autocorr(embeddings):
     """
     how stable is a speakers emotional state OVER time? 
     cosine sim of consecutive embeddings h[i] to h[i+1]
-    if high -> likely emotional consistency 
+    if high -> likely emotional consistency
     """
     acorr = []
     for i in range(len(embeddings)-1):
         acorr.append(cosine_similarity(embeddings[i], embeddings[i+1]))
     return acorr
+
+
+def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
+
+    h_A = embeddings_dict[speaker_A]
+    h_B = embeddings_dict[speaker_B]
+
+    # intra-speaker
+    deltas_A = compute_self_deltas(h_A)
+    deltas_B = compute_self_deltas(h_B)
+
+    # inter-speaker alignment
+    sim_AB = [
+        cosine_similarity(h_A[i], h_B[i+1])
+        for i in range(min(len(h_A)-1, len(h_B)-1))
+    ]
+
+    # contagion
+    dir_AB = [
+        cosine_similarity(deltas_A[i], deltas_B[i+1])
+        for i in range(min(len(deltas_A)-1, len(deltas_B)-1))
+    ]
+
+    # amplification
+    amp_AB = [
+        (torch.norm(deltas_B[i+1]) / torch.norm(deltas_A[i])).item()
+        for i in range(min(len(deltas_A)-1, len(deltas_B)-1))
+    ]
+
+    # emotional inertia
+    inertia_A = autocorr(h_A)
+    inertia_B = autocorr(h_B)
+
+    return {
+        "layer1_deltas": {
+            speaker_A: deltas_A,
+            speaker_B: deltas_B
+        },
+        "layer2_alignment_AB": sim_AB,
+        "layer3_contagion_AB": dir_AB,
+        "layer4_amplification_AB": amp_AB,
+        "layer5_inertia": {
+            speaker_A: inertia_A,
+            speaker_B: inertia_B
+        }
+    }
