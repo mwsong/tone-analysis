@@ -357,3 +357,72 @@ def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
             speaker_B: inertia_B
         }
     }
+
+
+#----------------------
+#another plot -> w annotations for interpretation
+#----------------------
+def plot_emotional_layers(h_A, h_B, speaker_A_name="Andrew", speaker_B_name="Justine",
+                          annotations=None):
+    """
+    Plots all 5 emotional layers for two speakers in a dialogue.
+    annotations: dict {utterance_index: label} to overlay points of interest
+    """
+    # Compute metrics
+    deltas_A = compute_self_deltas(h_A)
+    deltas_B = compute_self_deltas(h_B)
+    
+    self_delta_A = [torch.norm(d).item() for d in deltas_A]
+    self_delta_B = [torch.norm(d).item() for d in deltas_B]
+    
+    alignment = inter_speaker_alignment(h_A, h_B)
+    contagion = cross_speaker_delta(deltas_A, deltas_B)
+    amp = amplification(deltas_A, deltas_B)
+    inertia_A = autocorr(h_A)
+    inertia_B = autocorr(h_B)
+    
+    utterance_nums = list(range(2, len(h_A)+1))  
+    
+    fig, axs = plt.subplots(5, 1, figsize=(14, 18), sharex=True)
+    
+    # Layer 1: Self-deltas
+    axs[0].plot(utterance_nums, self_delta_A, marker='o', label=f"{speaker_A_name} Δ")
+    axs[0].plot(utterance_nums, self_delta_B, marker='o', label=f"{speaker_B_name} Δ")
+    axs[0].set_ylabel("Self-delta magnitude")
+    axs[0].set_title("Layer 1: Emotional change magnitude (Self-deltas)")
+    axs[0].legend()
+    
+    # Layer 2: Inter-speaker alignment
+    axs[1].plot(utterance_nums, alignment, marker='o', color='purple')
+    axs[1].set_ylabel("Cosine similarity")
+    axs[1].set_title("Layer 2: Inter-speaker alignment (Tone similarity)")
+    
+    # Layer 3: Cross-speaker delta (contagion)
+    axs[2].plot(utterance_nums[:-1], contagion, marker='o', color='orange')
+    axs[2].set_ylabel("Cosine similarity")
+    axs[2].set_title("Layer 3: Cross-speaker delta (Contagion / mirrored change)")
+    
+    # Layer 4: Amplification
+    axs[3].plot(utterance_nums[:-1], amp, marker='o', color='green')
+    axs[3].axhline(1, color='gray', linestyle='--', label='Equal Δ magnitude')
+    axs[3].set_ylabel("Amplification ratio (B/A)")
+    axs[3].set_title("Layer 4: Amplification (relative magnitude)")
+    axs[3].legend()
+    
+    # Layer 5: Autocorrelation (inertia)
+    axs[4].plot(utterance_nums, inertia_A, marker='o', label=f"{speaker_A_name} inertia")
+    axs[4].plot(utterance_nums, inertia_B, marker='o', label=f"{speaker_B_name} inertia")
+    axs[4].set_ylabel("Cosine similarity")
+    axs[4].set_title("Layer 5: Emotional inertia (stability over time)")
+    axs[4].set_xlabel("Utterance #")
+    axs[4].legend()
+    
+    # Overlay annotations if provided
+    if annotations:
+        for ax in axs:
+            for ut_num, label in annotations.items():
+                ax.axvline(ut_num, color='red', linestyle='--', alpha=0.5)
+                ax.text(ut_num + 0.1, ax.get_ylim()[1]*0.9, label, color='red', rotation=90)
+    
+    plt.tight_layout()
+    plt.show()
