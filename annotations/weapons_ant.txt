@@ -1,0 +1,11 @@
+justine,1: pleading
+andrew,3: formal
+justine,3: abrupt
+justine,4: pleading
+andrew,6: sounds like implying a trait
+justine,6: responds to implication
+andrew,7: sounds like deflection to new direction
+justine,7: very upset and annoyed
+justine,8: likely more upset
+andrew,10: acknowledged against his implication
+justine,10: defeat

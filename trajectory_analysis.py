@@ -151,6 +151,26 @@ def load_embeddings(path):
     with open(path, "rb") as f:
         return pickle.load(f)
 
+def load_annotations_txt(file_path, speakers):
+    annotations = {sp.lower(): {} for sp in speakers}
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                sp_utt, text = line.split(":", 1)
+                sp, utt = sp_utt.split(",", 1)
+                sp = sp.strip().lower()
+                utt = int(utt.strip()) - 1  # convert 1-based to 0-based
+                annotations[sp][utt] = text.strip()
+            except ValueError:
+                print(f"Skipping malformed line: {line}")
+    
+    return annotations
+
+
 #----------------------
 #pca/reduction functions
 #----------------------
@@ -379,10 +399,19 @@ def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotati
     axs[4].set_xlabel("Utterance pair")
 
     if annotations:
-        for ax in axs:
-            for idx, label in annotations.items():
-                ax.axvline(idx, color="red", linestyle="--", alpha=0.4)
-                ax.text(idx + 0.1, ax.get_ylim()[1]*0.9, label, color="red", rotation=90)
+        for sp, sp_ann in annotations.items():
+            for idx, text in sp_ann.items():
+                x_pos = idx + 1
+                if x_pos <= len(axs[0].lines[0].get_xdata()):
+                    axs[0].axvline(x_pos, color="red", linestyle="--", alpha=0.5)
+                    axs[0].text(
+                        x_pos + 0.1,
+                        axs[0].get_ylim()[1]*0.9,
+                        f"{sp}: {text}",
+                        color="red",
+                        rotation=90,
+                        fontsize=8
+                    )
 
     plt.suptitle(scene_name)
     plt.tight_layout()
