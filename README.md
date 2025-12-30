@@ -1,7 +1,7 @@
 # Exploratory Analysis of Emotional Trajectories with Wav2Vec
 
 # Overview 
-My project analyzes heated scenes from some movies I like to track emotional and prosodic dynamics over time. I wanted to mathematically quantify how, in conversations, peoples' emotions evolve, respond to each other, mirror each other, and escale throughout. 
+My project analyzes heated scenes from some movies I like to track emotional and prosodic dynamics over time. I wanted to mathematically quantify how, in conversations, peoples' emotions evolve, respond to each other, mirror each other, and escalate throughout. 
 
 # Motivation 
 When we're in dialogue, we perform appraisal and try to gauge the emotional space we're in, the interpersonal safety, and the abrupt changes of the other performer. My main questions and drivers towards this exploration were:
@@ -14,12 +14,12 @@ Audio embeddings: Wav2Vec2-mini
 Text embeddings(obsolete): miniLM (I ended up deciding that I wasn't sure how to concatenate the two embeddings together. If text embeddings were encoding on a different basis than the Wav2Vec, which captures prosody and tone, then I felt it could add noise to the information) 
 
 Layers of Analysis:
-Layer 0: mean value of raw embeddings 
-Layer 1: self change, how much change is happening from one response to the next within one speaker. (delta = h[t] - h[t-1]) just subtracting the vectors
-Layer 2: inter-speaker alignment. do the two speakers agree in the emotional space? (cosine similarity of h_A[t] and h_B[t] where h_B[t] would be the response to h_A[t])
-Layer 3: speaker contagion. is the speakers change similar to the other speakers change? or is there some influence in the direction of their prosodic dynamics? (cosine similarity of the deltas) 
-Layer 4: amplification. is speaker A or speaker B more salient? (norm of deltas divided by each other, norm_B/norm_A)
-Layer 5: emotional inertia. how much change in emotional state is occuring within one speaker's responses. (cosine similarity between h[t] and h[t+1])
+1. mean value of raw embeddings 
+2. self change, how much change is happening from one response to the next within one speaker. (delta = h[t] - h[t-1]) just subtracting the vectors
+3. inter-speaker alignment. do the two speakers agree in the emotional space? (cosine similarity of h_A[t] and h_B[t] where h_B[t] would be the response to h_A[t])
+4. speaker contagion. is the speakers change similar to the other speakers change? or is there some influence in the direction of their prosodic dynamics? (cosine similarity of the deltas) 
+5. amplification. is speaker A or speaker B more salient? (norm of deltas divided by each other, norm_B/norm_A)
+6. emotional inertia. how much change in emotional state is occuring within one speaker's responses. (cosine similarity between h[t] and h[t+1])
 
 Annotations: just my own subjective opinions on each utterance to compare to
 
