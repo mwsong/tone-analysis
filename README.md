@@ -1,7 +1,8 @@
 # Exploratory Analysis of Emotional Trajectories with Wav2Vec
 
 # Overview 
-My project analyzes heated scenes from some movies I like to track emotional and prosodic dynamics over time. I wanted to mathematically quantify how, in conversations, peoples' emotions evolve, respond to each other, mirror each other, and escalate throughout. 
+My project analyzes heated scenes from some movies (Weapons, Bugonia, and Blue Valentine)to track emotional and prosodic dynamics over time. I wanted to mathematically quantify how, in conversations, peoples' emotions evolve, respond to each other, mirror each other, and escalate throughout. 
+All results in weapons.ipynb, bugonia.ipynb, and blueval.ipynb. All functions used are in trajectory_analysis.py
 
 # Motivation 
 When we're in dialogue, we perform appraisal and try to gauge the emotional space we're in, the interpersonal safety, and the abrupt changes of the other performer. My main questions and drivers towards this exploration were:
