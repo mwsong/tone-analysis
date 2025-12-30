@@ -583,22 +583,22 @@ def interpret_speaker(
     reasoning = []
 
     if summary["mean_inertia"] > inertia_thresh and summary["mean_delta"] < delta_thresh:
-        descriptors.append("stable")
+        descriptors.append("fewer changes")
         reasoning.append(f"mean_inertia={summary['mean_inertia']:.2f} > {inertia_thresh}, mean_delta={summary['mean_delta']:.2f} < {delta_thresh}")
     if summary["mean_delta"] > delta_thresh and summary["mean_inertia"] < inertia_thresh:
-        descriptors.append("volatile")
+        descriptors.append("large changes")
         reasoning.append(f"mean_delta={summary['mean_delta']:.2f} > {delta_thresh}, mean_inertia={summary['mean_inertia']:.2f} < {inertia_thresh}")
 
     if cross["mean_amplification"] > amp_thresh and summary["mean_inertia"] < inertia_thresh:
-        descriptors.append("reactive")
+        descriptors.append("high response")
         reasoning.append(f"mean_amplification={cross['mean_amplification']:.2f} > {amp_thresh}, mean_inertia={summary['mean_inertia']:.2f} < {inertia_thresh}")
 
     if cross["mean_alignment"] > align_thresh and cross["mean_contagion"] > contagion_thresh:
-        descriptors.append("accommodating")
+        descriptors.append("high alignment")
         reasoning.append(f"mean_alignment={cross['mean_alignment']:.2f} > {align_thresh}, mean_contagion={cross['mean_contagion']:.2f} > {contagion_thresh}")
 
     if summary["mean_inertia"] > inertia_thresh and cross["mean_amplification"] < amp_thresh and cross["mean_contagion"] < contagion_thresh:
-        descriptors.append("rigid")
+        descriptors.append("low change throughout")
         reasoning.append(f"mean_inertia={summary['mean_inertia']:.2f} > {inertia_thresh}, mean_amplification={cross['mean_amplification']:.2f} < {amp_thresh}, mean_contagion={cross['mean_contagion']:.2f} < {contagion_thresh}")
 
     if summary["max_delta"] > delta_thresh:
