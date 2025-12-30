@@ -345,77 +345,99 @@ def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
 #----------------------
 #more plots! another plot -> w annotations for interpretation
 #----------------------
-def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotations=None):
-    fig, axs = plt.subplots(5, 1, figsize=(12, 15), sharex=False)
+def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotations=None, embedding_dict=None):
+    fig, axs = plt.subplots(6, 1, figsize=(12, 18), sharex=False)
+    colors = {sp: f"C{i}" for i, sp in enumerate(speakers)}
 
+    if embedding_dict:
+        for sp in speakers:
+            speaker_embeddings = torch.stack(embedding_dict[sp])
+            mean_vals = speaker_embeddings.mean(dim=1).numpy()
+            axs[0].plot(range(1, len(mean_vals)+1), mean_vals, marker='o', label=sp, color=colors[sp])
+
+        axs[0].set_title("Mean Audio Embedding per Utterance")
+        axs[0].set_ylabel("Mean Embedding")
+        axs[0].legend()
+        x_labels = [str(i) for i in range(1, len(mean_vals)+1)]
+        axs[0].set_xticks(range(1, len(mean_vals)+1))
+        axs[0].set_xticklabels(x_labels, rotation=0)
+
+        if annotations:
+            for sp, sp_ann in annotations.items():
+                for idx, text in sp_ann.items():
+                    x_pos = idx + 1
+                    if x_pos <= len(mean_vals):
+                        axs[0].text(
+                            x_pos,
+                            mean_vals[idx],
+                            f"{sp}: {text}",
+                            fontsize=8,
+                            color="black",
+                            ha="left",
+                            va="bottom",
+                            wrap=True,
+                            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', pad=1)
+                        )
+
+    plot_idx = 1
     for sp in speakers:
         deltas = [torch.norm(d).item() for d in emotional_dict["layer1_deltas"][sp]]
-        axs[0].plot(range(1, len(deltas)+1), deltas, marker="o", label=sp)
-    axs[0].set_title("Self change magnitude")
-    axs[0].set_ylabel("||Δ||")
-    axs[0].legend()
+        axs[plot_idx].plot(range(1, len(deltas)+1), deltas, marker="o", label=sp, color=colors[sp])
+    axs[plot_idx].set_title("Self Change Magnitude")
+    axs[plot_idx].set_ylabel("||Δ||")
+    axs[plot_idx].legend()
     x_labels = [f"{i}-{i+1}" for i in range(1, len(deltas)+1)]
-    axs[0].set_xticks(range(1, len(deltas)+1))
-    axs[0].set_xticklabels(x_labels, rotation=45)
-    axs[0].set_xlabel("Utterance pair")
+    axs[plot_idx].set_xticks(range(1, len(deltas)+1))
+    axs[plot_idx].set_xticklabels(x_labels, rotation=45)
+    axs[plot_idx].set_xlabel("Utterance pair")
 
+    plot_idx += 1
     sims = emotional_dict["layer2_alignment_AB"]
-    axs[1].plot(range(1, len(sims)+1), sims, marker="o", color="purple")
-    axs[1].set_title("Inter-speaker alignment")
-    axs[1].set_ylabel("cos(hA, hB)")
+    axs[plot_idx].plot(range(1, len(sims)+1), sims, marker="o", color="purple")
+    axs[plot_idx].set_title("Inter-Speaker Alignment")
+    axs[plot_idx].set_ylabel("cos(hA, hB)")
     x_labels = [str(i) for i in range(1, len(sims)+1)]
-    axs[1].set_xticks(range(1, len(sims)+1))
-    axs[1].set_xticklabels(x_labels, rotation=0)
-    axs[1].set_xlabel("Utterance index")
+    axs[plot_idx].set_xticks(range(1, len(sims)+1))
+    axs[plot_idx].set_xticklabels(x_labels, rotation=0)
+    axs[plot_idx].set_xlabel("Utterance index")
 
+    plot_idx += 1
     contagion = emotional_dict["layer3_contagion_AB"]
-    axs[2].plot(range(1, len(contagion)+1), contagion, marker="o", color="orange")
-    axs[2].set_title("Contagion")
-    axs[2].set_ylabel("cos(ΔA, ΔB)")
+    axs[plot_idx].plot(range(1, len(contagion)+1), contagion, marker="o", color="orange")
+    axs[plot_idx].set_title("Contagion")
+    axs[plot_idx].set_ylabel("cos(ΔA, ΔB)")
     x_labels = [f"{i}-{i+1}" for i in range(1, len(contagion)+1)]
-    axs[2].set_xticks(range(1, len(contagion)+1))
-    axs[2].set_xticklabels(x_labels, rotation=45)
-    axs[2].set_xlabel("Utterance pair")
+    axs[plot_idx].set_xticks(range(1, len(contagion)+1))
+    axs[plot_idx].set_xticklabels(x_labels, rotation=45)
+    axs[plot_idx].set_xlabel("Utterance pair")
 
+    plot_idx += 1
     amp = emotional_dict["layer4_amplification_AB"]
-    axs[3].plot(range(1, len(amp)+1), amp, marker="o", color="green")
-    axs[3].axhline(1.0, linestyle="--", alpha=0.5)
-    axs[3].set_title("Amplification")
-    axs[3].set_ylabel("||ΔB|| / ||ΔA||")
+    axs[plot_idx].plot(range(1, len(amp)+1), amp, marker="o", color="green")
+    axs[plot_idx].axhline(1.0, linestyle="--", alpha=0.5)
+    axs[plot_idx].set_title("Amplification")
+    axs[plot_idx].set_ylabel("||ΔB|| / ||ΔA||")
     x_labels = [f"{i}-{i+1}" for i in range(1, len(amp)+1)]
-    axs[3].set_xticks(range(1, len(amp)+1))
-    axs[3].set_xticklabels(x_labels, rotation=45)
-    axs[3].set_xlabel("Utterance pair")
+    axs[plot_idx].set_xticks(range(1, len(amp)+1))
+    axs[plot_idx].set_xticklabels(x_labels, rotation=45)
+    axs[plot_idx].set_xlabel("Utterance pair")
 
+    plot_idx += 1
     for sp in speakers:
         inertia = emotional_dict["layer5_inertia"][sp]
-        axs[4].plot(range(1, len(inertia)+1), inertia, marker="o", label=sp)
-    axs[4].set_title("Emotional inertia")
-    axs[4].set_ylabel("cos(h[t], h[t+1])")
-    axs[4].legend()
+        axs[plot_idx].plot(range(1, len(inertia)+1), inertia, marker="o", label=sp, color=colors[sp])
+    axs[plot_idx].set_title("Emotional Inertia")
+    axs[plot_idx].set_ylabel("cos(h[t], h[t+1])")
+    axs[plot_idx].legend()
     x_labels = [f"{i}-{i+1}" for i in range(1, len(inertia)+1)]
-    axs[4].set_xticks(range(1, len(inertia)+1))
-    axs[4].set_xticklabels(x_labels, rotation=45)
-    axs[4].set_xlabel("Utterance pair")
-
-    if annotations:
-        for sp, sp_ann in annotations.items():
-            for idx, text in sp_ann.items():
-                x_pos = idx + 1
-                if x_pos <= len(axs[0].lines[0].get_xdata()):
-                    axs[0].axvline(x_pos, color="red", linestyle="--", alpha=0.5)
-                    axs[0].text(
-                        x_pos + 0.1,
-                        axs[0].get_ylim()[1]*0.9,
-                        f"{sp}: {text}",
-                        color="red",
-                        rotation=90,
-                        fontsize=8
-                    )
+    axs[plot_idx].set_xticks(range(1, len(inertia)+1))
+    axs[plot_idx].set_xticklabels(x_labels, rotation=45)
+    axs[plot_idx].set_xlabel("Utterance pair")
 
     plt.suptitle(scene_name)
     plt.tight_layout()
     plt.show()
+
 
 def plot_delta_directions(
     embeddings_dict,

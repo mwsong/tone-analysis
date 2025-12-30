@@ -1,0 +1,15 @@
+dean,2: playful
+cindy,2: also chill
+dean,4: annoyed
+dean,5: seems annoyed at cindy now
+cindy,5: defensive
+dean,7: interrogative 
+cindy,7: flustered
+dean,8: upset
+cindy,9: very flustered
+dean,10: annoyed
+dean,11: condescending almost
+cindy,12: still flustered
+cindy,15: retreating
+dean,16: still upset
+cindy,16: fully backed down

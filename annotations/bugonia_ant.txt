@@ -1,0 +1,8 @@
+teddy,2: implies only hes there for don
+don,4: unsure
+teddy,7: implies he knows whats best
+teddy,11: says source is trust me bro
+don,12: unsure again
+teddy,12: claims important again
+don,13: expresses concern
+teddy,13: implies he knows best again
