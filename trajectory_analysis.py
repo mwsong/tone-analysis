@@ -29,6 +29,9 @@ audio_model.eval()
 
 #helper functions ------ 
 def load_audio(file_path):
+    """
+    reads wav using soundfile to convert to a tensor
+    """
     waveform, sample_rate = sf.read(file_path)
     waveform = torch.tensor(waveform, dtype=torch.float32)
 
@@ -45,6 +48,9 @@ def load_audio(file_path):
 
 
 def get_audio_embedding(waveform):
+    """
+    uses wav2vec to convert raw audio (in tensor form) to embedding (vector representing tone, prosody)
+    """
     inputs = processor(
         waveform,
         sampling_rate=16000,
@@ -59,6 +65,9 @@ def get_audio_embedding(waveform):
 
 
 def get_text_embeddings(utterances):
+    """
+    uses miniLM to encode list of sentences into embeddings 
+    """
     return text_model.encode(
         utterances,
         convert_to_tensor=True
@@ -74,6 +83,8 @@ def embed_audio_scene(audio_folder, speakers):
     """
     audio_folder: folder containing wavs
     speakers: ["andrew", "justine"]
+
+    loops through speakers audio files in a folder, returns dict of audio emb
     """
     embeddings = {s: [] for s in speakers}
 
@@ -91,9 +102,7 @@ def embed_audio_scene(audio_folder, speakers):
 
 def embed_text_scene(transcript_path, speakers):
     """
-    transcript format:
-    ANDREW blah blah
-    JUSTINE blah blah
+    returns dict of text embed of dilaogue
     """
     text_dict = {s: [] for s in speakers}
 
@@ -113,6 +122,9 @@ def embed_text_scene(transcript_path, speakers):
 
 
 def combine_embeddings(audio_embs, text_embs, normalize_first=True):
+    """
+    concatenates audio embeds and text embeds.... maybe don't want this tbh  
+    """
     combined = {}
 
     for speaker in audio_embs:
@@ -129,6 +141,9 @@ def combine_embeddings(audio_embs, text_embs, normalize_first=True):
 
 #saving/load embeds 
 def save_embeddings(obj, path):
+    """
+    path should be like the whole path.. i think like eg. saved_embeds/audio_embeddings.pkl
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         pickle.dump(obj, f)
@@ -142,6 +157,9 @@ def load_embeddings(path):
 #pca/reduction functions
 #----------------------
 def reduce_embeddings(X, method="pca", n_components=2):
+    """
+    X is the 2d mtrix of embeddings, torch stack basically of embeddings_dict[speaker1]
+    """
     if method is None:
         return X
 
@@ -160,14 +178,21 @@ def reduce_embeddings(X, method="pca", n_components=2):
 #----------------------
 def plot_embedding_trajectory(
     embeddings_dict,
+    speakers,
     reducer="pca",
     n_components=2,
     annotate=True,
     show_deltas=False,
-    title="Embedding Trajectory"
+    title="Embedding Trajectory",
 ):
+    """
+    plots path of embeddings over time for each speaker in 2d 
+    annotates each point with utterance number 
+    optionally shows arrow for delta between consecutive embeddings
+    speakers is array in order of the first speaker, then second
+    """
     plt.figure(figsize=(10, 6))
-    colors = {"andrew": "blue", "justine": "red"}
+    colors = {speakers[0]: "blue", speakers[1]: "green"}
 
     for speaker, emb_list in embeddings_dict.items():
         X = torch.stack(emb_list).numpy()
@@ -226,6 +251,9 @@ def plot_metric(metric_list, speaker_name, scene_name="Scene", ylabel="Value"):
     plt.show()
 
 def plot_all_layers(emotional_dict, scene_name="Scene"):
+    """
+    for all the layers, plot metric for each layer ^
+    """
     for layer_name, data in emotional_dict.items():
         if isinstance(data, dict):
             for speaker, metric_list in data.items():
@@ -290,7 +318,7 @@ def cross_speaker_delta(deltas_A, deltas_B):
     """
     compares the DELTAS. checks if B's change ALSO FOLLOWS A's change. 
     each delta is above^ func. how does A change from one utterance i to i+1
-    deltaB[i+1] is HOW B changed in response. SO !!!!! speaker A has to be the first initiator 
+    deltaB[i] is HOW B changed in response. SO !!!!! speaker A has to be the first initiator 
     and speaker B is the second.. 
     """
     dirs = []
@@ -300,14 +328,13 @@ def cross_speaker_delta(deltas_A, deltas_B):
 
 def amplification(deltas_A, deltas_B):
     """
-    whose emotional change is stronger/weaker. norm is the euclidean length(could change later)
-    and normB/normA is the amplification ratio 
+    salience. who is "more salient" norm is the euclidean length(could change later) 
     """
     amps = []
     for i in range(len(deltas_A)-1):
         norm_A = torch.norm(deltas_A[i])
         norm_B = torch.norm(deltas_B[i])
-        amps.append((norm_B / norm_A).item())
+        amps.append((norm_B / (norm_A + 1e-6)).item())
     return amps
 
 def autocorr(embeddings):
@@ -360,69 +387,276 @@ def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
 
 
 #----------------------
-#another plot -> w annotations for interpretation
+#more plots! another plot -> w annotations for interpretation
 #----------------------
-def plot_emotional_layers(h_A, h_B, speaker_A_name="Andrew", speaker_B_name="Justine",
-                          annotations=None):
+def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotations=None):
     """
-    Plots all 5 emotional layers for two speakers in a dialogue.
-    annotations: dict {utterance_index: label} to overlay points of interest
+    basically another version of plot all layers that's loweky... may not need but imma keep here anyways for now
     """
-    # Compute metrics
-    deltas_A = compute_self_deltas(h_A)
-    deltas_B = compute_self_deltas(h_B)
-    
-    self_delta_A = [torch.norm(d).item() for d in deltas_A]
-    self_delta_B = [torch.norm(d).item() for d in deltas_B]
-    
-    alignment = inter_speaker_alignment(h_A, h_B)
-    contagion = cross_speaker_delta(deltas_A, deltas_B)
-    amp = amplification(deltas_A, deltas_B)
-    inertia_A = autocorr(h_A)
-    inertia_B = autocorr(h_B)
-    
-    utterance_nums = list(range(2, len(h_A)+1))  
-    
-    fig, axs = plt.subplots(5, 1, figsize=(14, 18), sharex=True)
-    
-    # Layer 1: Self-deltas
-    axs[0].plot(utterance_nums, self_delta_A, marker='o', label=f"{speaker_A_name} Δ")
-    axs[0].plot(utterance_nums, self_delta_B, marker='o', label=f"{speaker_B_name} Δ")
-    axs[0].set_ylabel("Self-delta magnitude")
-    axs[0].set_title("Layer 1: Emotional change magnitude (Self-deltas)")
+    fig, axs = plt.subplots(5, 1, figsize=(12, 15), sharex=True)
+
+    for sp in speakers:
+        deltas = emotional_dict["layer1_deltas"][sp]
+        norms = [torch.norm(d).item() for d in deltas]
+        axs[0].plot(norms, marker="o", label=sp)
+
+    axs[0].set_title("Self change magnitude")
+    axs[0].set_ylabel("||Δ||")
     axs[0].legend()
-    
-    # Layer 2: Inter-speaker alignment
-    axs[1].plot(utterance_nums, alignment, marker='o', color='purple')
-    axs[1].set_ylabel("Cosine similarity")
-    axs[1].set_title("Layer 2: Inter-speaker alignment (Tone similarity)")
-    
-    # Layer 3: Cross-speaker delta (contagion)
-    axs[2].plot(utterance_nums[:-1], contagion, marker='o', color='orange')
-    axs[2].set_ylabel("Cosine similarity")
-    axs[2].set_title("Layer 3: Cross-speaker delta (Contagion / mirrored change)")
-    
-    # Layer 4: Amplification
-    axs[3].plot(utterance_nums[:-1], amp, marker='o', color='green')
-    axs[3].axhline(1, color='gray', linestyle='--', label='Equal Δ magnitude')
-    axs[3].set_ylabel("Amplification ratio (B/A)")
-    axs[3].set_title("Layer 4: Amplification (relative magnitude)")
-    axs[3].legend()
-    
-    # Layer 5: Autocorrelation (inertia)
-    axs[4].plot(utterance_nums, inertia_A, marker='o', label=f"{speaker_A_name} inertia")
-    axs[4].plot(utterance_nums, inertia_B, marker='o', label=f"{speaker_B_name} inertia")
-    axs[4].set_ylabel("Cosine similarity")
-    axs[4].set_title("Layer 5: Emotional inertia (stability over time)")
-    axs[4].set_xlabel("Utterance #")
+
+    axs[1].plot(
+        emotional_dict["layer2_alignment_AB"],
+        marker="o",
+        color="purple"
+    )
+    axs[1].set_title("Inter-speaker alignment")
+    axs[1].set_ylabel("cos(hA, hB)")
+
+    axs[2].plot(
+        emotional_dict["layer3_contagion_AB"],
+        marker="o",
+        color="orange"
+    )
+    axs[2].set_title("Contagion")
+    axs[2].set_ylabel("cos(ΔA, ΔB)")
+
+    axs[3].plot(
+        emotional_dict["layer4_amplification_AB"],
+        marker="o",
+        color="green"
+    )
+    axs[3].axhline(1.0, linestyle="--", alpha=0.5)
+    axs[3].set_title("Amplification")
+    axs[3].set_ylabel("||ΔB|| / ||ΔA||")
+
+    for sp in speakers:
+        axs[4].plot(
+            emotional_dict["layer5_inertia"][sp],
+            marker="o",
+            label=sp
+        )
+
+    axs[4].set_title("Emotional inertia")
+    axs[4].set_ylabel("cos(h[t], h[t+1])")
     axs[4].legend()
-    
-    # Overlay annotations if provided
+
     if annotations:
         for ax in axs:
-            for ut_num, label in annotations.items():
-                ax.axvline(ut_num, color='red', linestyle='--', alpha=0.5)
-                ax.text(ut_num + 0.1, ax.get_ylim()[1]*0.9, label, color='red', rotation=90)
-    
+            for idx, label in annotations.items():
+                ax.axvline(idx, color="red", linestyle="--", alpha=0.4)
+                ax.text(idx + 0.1, ax.get_ylim()[1]*0.9, label, color="red", rotation=90)
+
+    axs[-1].set_xlabel("Utterance index")
+    plt.suptitle(scene_name)
     plt.tight_layout()
     plt.show()
+
+
+def plot_delta_directions(
+    embeddings_dict,
+    speakers,
+    reducer="pca",
+    n_components=2,
+    title="Directional Emotional Change"
+):
+    """
+    plots directions of delta 
+    """
+
+    plt.figure(figsize=(10, 6))
+
+    # assign colors dynamically
+    cmap = plt.get_cmap("tab10")
+    speaker_colors = {s: cmap(i) for i, s in enumerate(speakers)}
+
+    for speaker in speakers:
+        emb_list = embeddings_dict[speaker]
+
+        X = torch.stack(emb_list).numpy()
+
+        X_red = reduce_embeddings(X, method=reducer, n_components=n_components)
+
+        plt.scatter(
+            X_red[:, 0],
+            X_red[:, 1],
+            color=speaker_colors[speaker],
+            label=speaker
+        )
+
+        for i in range(1, len(X_red)):
+            dx = X_red[i, 0] - X_red[i - 1, 0]
+            dy = X_red[i, 1] - X_red[i - 1, 1]
+
+            plt.arrow(
+                X_red[i - 1, 0],
+                X_red[i - 1, 1],
+                dx,
+                dy,
+                head_width=0.02,
+                alpha=0.7,
+                length_includes_head=True,
+                color=speaker_colors[speaker]
+            )
+
+            plt.text(
+                X_red[i, 0],
+                X_red[i, 1],
+                str(i + 1),
+                fontsize=9
+            )
+
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def summarize_speaker_metrics(emotional_dict, speaker):
+    """
+    summarizes for single speaker
+    """
+
+    deltas = emotional_dict["layer1_deltas"][speaker]
+    inertia = emotional_dict["layer5_inertia"][speaker]
+
+    #how much did emotional state shift disregard direction
+    delta_mags = [torch.norm(d).item() for d in deltas]
+
+    return {
+        "mean_delta": float(np.mean(delta_mags)) if delta_mags else 0.0,
+        "max_delta": float(np.max(delta_mags)) if delta_mags else 0.0,
+        "mean_inertia": float(np.mean(inertia)) if inertia else 0.0,
+    }
+
+def summarize_cross_metrics(emotional_dict):
+    return {
+        "mean_alignment": float(np.mean(emotional_dict["layer2_alignment_AB"])),
+        "mean_contagion": float(np.mean(emotional_dict["layer3_contagion_AB"])),
+        "mean_amplification": float(np.mean(emotional_dict["layer4_amplification_AB"]))
+    }
+
+def interpret_speaker(
+    emotional_dict,
+    speaker,
+    speakers,
+    delta_thresh=0.6,
+    inertia_thresh=0.75,
+    amp_thresh=1.1,
+    align_thresh=0.6,
+    contagion_thresh=0.6
+):
+    """
+    Returns an interpretable statement describing a speaker's emotional behavior.
+    """
+
+    summary = summarize_speaker_metrics(emotional_dict, speaker)
+    cross = summarize_cross_metrics(emotional_dict)
+
+    statements = []
+
+    if summary["mean_inertia"] > inertia_thresh and summary["mean_delta"] < delta_thresh:
+        statements.append("demonstrates emotional stability")
+
+    if summary["mean_delta"] > delta_thresh and summary["mean_inertia"] < inertia_thresh:
+        statements.append("shows emotional volatility")
+
+    if cross["mean_amplification"] > amp_thresh and summary["mean_inertia"] < inertia_thresh:
+        statements.append("is highly reactive to the other speaker")
+
+    if cross["mean_alignment"] > align_thresh and cross["mean_contagion"] > contagion_thresh:
+        statements.append("emotionally accommodates and mirrors the other speaker")
+
+    if (
+        cross["mean_contagion"] < contagion_thresh
+        and cross["mean_amplification"] < amp_thresh
+        and summary["mean_inertia"] > inertia_thresh
+    ):
+        statements.append("resists emotional influence and maintains their own tone")
+
+    if summary["max_delta"] > delta_thresh:
+        statements.append("undergoes noticeable emotional changes")
+
+    if not statements:
+        statements.append("shows no strong emotional pattern in this scene")
+
+    return f"{speaker}: " + "; ".join(statements) + "."
+
+def compute_scene_thresholds(
+    emotional_dict,
+    speakers,
+    delta_q=0.7,
+    inertia_q=0.7,
+    amp_q=0.7,
+    align_q=0.7,
+    contagion_q=0.7
+):
+    """
+    scene-relative thresholds
+    """
+
+    all_mean_deltas = []
+    all_mean_inertias = []
+
+    for speaker in speakers:
+        summary = summarize_speaker_metrics(emotional_dict, speaker)
+        all_mean_deltas.append(summary["mean_delta"])
+        all_mean_inertias.append(summary["mean_inertia"])
+
+    cross = summarize_cross_metrics(emotional_dict)
+
+    thresholds = {
+        "delta_thresh": float(np.quantile(all_mean_deltas, delta_q)),
+        "inertia_thresh": float(np.quantile(all_mean_inertias, inertia_q)),
+        "amp_thresh": float(cross["mean_amplification"]),   # single value → relative use
+        "align_thresh": float(cross["mean_alignment"]),
+        "contagion_thresh": float(cross["mean_contagion"]),
+    }
+
+    return thresholds
+
+def generate_scene_summary(emotional_dict, speakers):
+    thresholds = compute_scene_thresholds(emotional_dict, speakers)
+    summaries = []
+
+    for speaker in speakers:
+        statement = interpret_speaker(
+            emotional_dict,
+            speaker,
+            speakers,
+            **thresholds
+        )
+        print(statement)   
+        summaries.append(statement)
+
+    return summaries
+
+
+def plot_emotional_stability_map(emotional_dict, speakers):
+    """
+    stability 
+    top-left: stable
+    bottom-right: volatile
+    top-right: intense, consistent 
+    bottom-left: muted
+    """
+    plt.figure(figsize=(6,6))
+
+    for speaker in speakers:
+        summary = summarize_speaker_metrics(emotional_dict, speaker)
+        x = summary["mean_delta"]
+        y = summary["mean_inertia"]
+
+        plt.scatter(x, y)
+        plt.text(x + 0.01, y + 0.01, speaker)
+
+    plt.xlabel("Mean Delta (Volatility)")
+    plt.ylabel("Mean Inertia (Stability)")
+    plt.title("Emotional Stability Map (Scene-relative)")
+    plt.grid(True)
+    plt.show()
+
+
+
+
+
+
+
