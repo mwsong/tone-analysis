@@ -7,7 +7,6 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 import torchaudio
 import torch.nn.functional as F
-from torch.nn.functional import cosine_similarity
 from sklearn.decomposition import PCA
 
 
@@ -144,7 +143,6 @@ def save_embeddings(obj, path):
     """
     path should be like the whole path.. i think like eg. saved_embeds/audio_embeddings.pkl
     """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         pickle.dump(obj, f)
 
@@ -176,67 +174,6 @@ def reduce_embeddings(X, method="pca", n_components=2):
 #----------------------
 #plotting functions
 #----------------------
-def plot_embedding_trajectory(
-    embeddings_dict,
-    speakers,
-    reducer="pca",
-    n_components=2,
-    annotate=True,
-    show_deltas=False,
-    title="Embedding Trajectory",
-):
-    """
-    plots path of embeddings over time for each speaker in 2d 
-    annotates each point with utterance number 
-    optionally shows arrow for delta between consecutive embeddings
-    speakers is array in order of the first speaker, then second
-    """
-    plt.figure(figsize=(10, 6))
-    colors = {speakers[0]: "blue", speakers[1]: "green"}
-
-    for speaker, emb_list in embeddings_dict.items():
-        X = torch.stack(emb_list).numpy()
-
-        # reduce
-        X_red = reduce_embeddings(X, method=reducer, n_components=n_components)
-
-        # plot path
-        plt.plot(
-            X_red[:, 0],
-            X_red[:, 1],
-            marker="o",
-            label=speaker,
-            color=colors.get(speaker, "black")
-        )
-
-        # annotate time
-        if annotate:
-            for i, (x, y) in enumerate(X_red):
-                plt.text(x, y, str(i+1), fontsize=9)
-
-        # arrows + deltas
-        if show_deltas:
-            deltas = compute_self_deltas(emb_list)
-            for i in range(1, len(X_red)):
-                color = "red" if deltas[i-1] < 0.95 else colors.get(speaker, "black")
-                plt.arrow(
-                    X_red[i-1, 0], X_red[i-1, 1],
-                    X_red[i, 0] - X_red[i-1, 0],
-                    X_red[i, 1] - X_red[i-1, 1],
-                    head_width=0.02,
-                    alpha=0.6,
-                    color=color,
-                    length_includes_head=True
-                )
-
-    plt.xlabel("Dim 1")
-    plt.ylabel("Dim 2")
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-    
-
 def plot_metric(metric_list, speaker_name, scene_name="Scene", ylabel="Value"):
     """
     Plot by time for the different emotional analysis layers below 
@@ -247,7 +184,6 @@ def plot_metric(metric_list, speaker_name, scene_name="Scene", ylabel="Value"):
     plt.xlabel("Utterance #")
     plt.ylabel(ylabel)
     plt.grid(True)
-    plt.legend()
     plt.show()
 
 def plot_all_layers(emotional_dict, scene_name="Scene"):
@@ -310,7 +246,7 @@ def inter_speaker_alignment(h_A, h_B):
     high sim => B's state aligns with A's. returns list of sim scores OVER TIME
     """
     sims = []
-    for i in range(len(h_A)-1):
+    for i in range(len(h_A)):
         sims.append(cosine_similarity(h_A[i], h_B[i]))
     return sims
 
@@ -322,7 +258,7 @@ def cross_speaker_delta(deltas_A, deltas_B):
     and speaker B is the second.. 
     """
     dirs = []
-    for i in range(len(deltas_A)-1):
+    for i in range(len(deltas_A)):
         dirs.append(cosine_similarity(deltas_A[i], deltas_B[i]))
     return dirs
 
@@ -331,7 +267,7 @@ def amplification(deltas_A, deltas_B):
     salience. who is "more salient" norm is the euclidean length(could change later) 
     """
     amps = []
-    for i in range(len(deltas_A)-1):
+    for i in range(len(deltas_A)):
         norm_A = torch.norm(deltas_A[i])
         norm_B = torch.norm(deltas_B[i])
         amps.append((norm_B / (norm_A + 1e-6)).item())
@@ -390,55 +326,57 @@ def run_emotional_layers(embeddings_dict, speaker_A, speaker_B):
 #more plots! another plot -> w annotations for interpretation
 #----------------------
 def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotations=None):
-    """
-    basically another version of plot all layers that's loweky... may not need but imma keep here anyways for now
-    """
-    fig, axs = plt.subplots(5, 1, figsize=(12, 15), sharex=True)
+    fig, axs = plt.subplots(5, 1, figsize=(12, 15), sharex=False)
 
     for sp in speakers:
-        deltas = emotional_dict["layer1_deltas"][sp]
-        norms = [torch.norm(d).item() for d in deltas]
-        axs[0].plot(norms, marker="o", label=sp)
-
+        deltas = [torch.norm(d).item() for d in emotional_dict["layer1_deltas"][sp]]
+        axs[0].plot(range(1, len(deltas)+1), deltas, marker="o", label=sp)
     axs[0].set_title("Self change magnitude")
     axs[0].set_ylabel("||Δ||")
     axs[0].legend()
+    x_labels = [f"{i}-{i+1}" for i in range(1, len(deltas)+1)]
+    axs[0].set_xticks(range(1, len(deltas)+1))
+    axs[0].set_xticklabels(x_labels, rotation=45)
+    axs[0].set_xlabel("Utterance pair")
 
-    axs[1].plot(
-        emotional_dict["layer2_alignment_AB"],
-        marker="o",
-        color="purple"
-    )
+    sims = emotional_dict["layer2_alignment_AB"]
+    axs[1].plot(range(1, len(sims)+1), sims, marker="o", color="purple")
     axs[1].set_title("Inter-speaker alignment")
     axs[1].set_ylabel("cos(hA, hB)")
+    x_labels = [str(i) for i in range(1, len(sims)+1)]
+    axs[1].set_xticks(range(1, len(sims)+1))
+    axs[1].set_xticklabels(x_labels, rotation=0)
+    axs[1].set_xlabel("Utterance index")
 
-    axs[2].plot(
-        emotional_dict["layer3_contagion_AB"],
-        marker="o",
-        color="orange"
-    )
+    contagion = emotional_dict["layer3_contagion_AB"]
+    axs[2].plot(range(1, len(contagion)+1), contagion, marker="o", color="orange")
     axs[2].set_title("Contagion")
     axs[2].set_ylabel("cos(ΔA, ΔB)")
+    x_labels = [f"{i}-{i+1}" for i in range(1, len(contagion)+1)]
+    axs[2].set_xticks(range(1, len(contagion)+1))
+    axs[2].set_xticklabels(x_labels, rotation=45)
+    axs[2].set_xlabel("Utterance pair")
 
-    axs[3].plot(
-        emotional_dict["layer4_amplification_AB"],
-        marker="o",
-        color="green"
-    )
+    amp = emotional_dict["layer4_amplification_AB"]
+    axs[3].plot(range(1, len(amp)+1), amp, marker="o", color="green")
     axs[3].axhline(1.0, linestyle="--", alpha=0.5)
     axs[3].set_title("Amplification")
     axs[3].set_ylabel("||ΔB|| / ||ΔA||")
+    x_labels = [f"{i}-{i+1}" for i in range(1, len(amp)+1)]
+    axs[3].set_xticks(range(1, len(amp)+1))
+    axs[3].set_xticklabels(x_labels, rotation=45)
+    axs[3].set_xlabel("Utterance pair")
 
     for sp in speakers:
-        axs[4].plot(
-            emotional_dict["layer5_inertia"][sp],
-            marker="o",
-            label=sp
-        )
-
+        inertia = emotional_dict["layer5_inertia"][sp]
+        axs[4].plot(range(1, len(inertia)+1), inertia, marker="o", label=sp)
     axs[4].set_title("Emotional inertia")
     axs[4].set_ylabel("cos(h[t], h[t+1])")
     axs[4].legend()
+    x_labels = [f"{i}-{i+1}" for i in range(1, len(inertia)+1)]
+    axs[4].set_xticks(range(1, len(inertia)+1))
+    axs[4].set_xticklabels(x_labels, rotation=45)
+    axs[4].set_xlabel("Utterance pair")
 
     if annotations:
         for ax in axs:
@@ -446,11 +384,9 @@ def plot_emotional_layers(emotional_dict, speakers, scene_name="Scene", annotati
                 ax.axvline(idx, color="red", linestyle="--", alpha=0.4)
                 ax.text(idx + 0.1, ax.get_ylim()[1]*0.9, label, color="red", rotation=90)
 
-    axs[-1].set_xlabel("Utterance index")
     plt.suptitle(scene_name)
     plt.tight_layout()
     plt.show()
-
 
 def plot_delta_directions(
     embeddings_dict,
@@ -534,51 +470,130 @@ def summarize_cross_metrics(emotional_dict):
         "mean_amplification": float(np.mean(emotional_dict["layer4_amplification_AB"]))
     }
 
+def flag_trends(emotional_dict, speaker, delta_thresh=0.6, inertia_thresh=0.75, amp_thresh=1.1,
+                align_thresh=0.6, contagion_thresh=0.6):
+    """
+    Returns a dictionary with per-utterance flags for trends in metrics.
+    """
+    trends = {
+        "volatility": [],
+        "reactive": [],
+        "accommodating": [],
+        "rigid": [],
+        "notable_shift": []
+    }
+
+    deltas = [torch.norm(d).item() for d in emotional_dict["layer1_deltas"][speaker]]
+    inertia = emotional_dict["layer5_inertia"][speaker]
+
+    amplifications = emotional_dict["layer4_amplification_AB"]
+    alignments = emotional_dict["layer2_alignment_AB"]
+    contagions = emotional_dict["layer3_contagion_AB"]
+
+    n = len(deltas)
+
+    for i in range(n):
+        if deltas[i] > delta_thresh and inertia[i] < inertia_thresh:
+            trends["volatility"].append(i)
+
+        if i < len(amplifications) and amplifications[i] > amp_thresh and inertia[i] < inertia_thresh:
+            trends["reactive"].append(i)
+
+        if i < len(alignments) and alignments[i] > align_thresh and i < len(contagions) and contagions[i] > contagion_thresh:
+            trends["accommodating"].append(i)
+
+        if i < len(amplifications) and i < len(contagions) and inertia[i] > inertia_thresh \
+           and amplifications[i] < amp_thresh and contagions[i] < contagion_thresh:
+            trends["rigid"].append(i)
+
+        if deltas[i] > delta_thresh:
+            trends["notable_shift"].append(i)
+
+    return trends
+
 def interpret_speaker(
     emotional_dict,
     speaker,
-    speakers,
     delta_thresh=0.6,
     inertia_thresh=0.75,
     amp_thresh=1.1,
     align_thresh=0.6,
-    contagion_thresh=0.6
+    contagion_thresh=0.6,
+    verbose=True
 ):
     """
-    Returns an interpretable statement describing a speaker's emotional behavior.
+    Returns multiple descriptors of speaker behavior based on emotional metrics.
+    Includes reasoning if verbose=True.
     """
-
     summary = summarize_speaker_metrics(emotional_dict, speaker)
     cross = summarize_cross_metrics(emotional_dict)
 
-    statements = []
+    descriptors = []
+    reasoning = []
 
     if summary["mean_inertia"] > inertia_thresh and summary["mean_delta"] < delta_thresh:
-        statements.append("demonstrates emotional stability")
-
+        descriptors.append("stable")
+        reasoning.append(f"mean_inertia={summary['mean_inertia']:.2f} > {inertia_thresh}, mean_delta={summary['mean_delta']:.2f} < {delta_thresh}")
     if summary["mean_delta"] > delta_thresh and summary["mean_inertia"] < inertia_thresh:
-        statements.append("shows emotional volatility")
+        descriptors.append("volatile")
+        reasoning.append(f"mean_delta={summary['mean_delta']:.2f} > {delta_thresh}, mean_inertia={summary['mean_inertia']:.2f} < {inertia_thresh}")
 
     if cross["mean_amplification"] > amp_thresh and summary["mean_inertia"] < inertia_thresh:
-        statements.append("is highly reactive to the other speaker")
+        descriptors.append("reactive")
+        reasoning.append(f"mean_amplification={cross['mean_amplification']:.2f} > {amp_thresh}, mean_inertia={summary['mean_inertia']:.2f} < {inertia_thresh}")
 
     if cross["mean_alignment"] > align_thresh and cross["mean_contagion"] > contagion_thresh:
-        statements.append("emotionally accommodates and mirrors the other speaker")
+        descriptors.append("accommodating")
+        reasoning.append(f"mean_alignment={cross['mean_alignment']:.2f} > {align_thresh}, mean_contagion={cross['mean_contagion']:.2f} > {contagion_thresh}")
 
-    if (
-        cross["mean_contagion"] < contagion_thresh
-        and cross["mean_amplification"] < amp_thresh
-        and summary["mean_inertia"] > inertia_thresh
-    ):
-        statements.append("resists emotional influence and maintains their own tone")
+    if summary["mean_inertia"] > inertia_thresh and cross["mean_amplification"] < amp_thresh and cross["mean_contagion"] < contagion_thresh:
+        descriptors.append("rigid")
+        reasoning.append(f"mean_inertia={summary['mean_inertia']:.2f} > {inertia_thresh}, mean_amplification={cross['mean_amplification']:.2f} < {amp_thresh}, mean_contagion={cross['mean_contagion']:.2f} < {contagion_thresh}")
 
     if summary["max_delta"] > delta_thresh:
-        statements.append("undergoes noticeable emotional changes")
+        descriptors.append("experiences noticeable emotional shifts")
+        reasoning.append(f"max_delta={summary['max_delta']:.2f} > {delta_thresh}")
 
-    if not statements:
-        statements.append("shows no strong emotional pattern in this scene")
+    if not descriptors:
+        descriptors.append("no strong emotional pattern")
+        reasoning.append(f"All metrics below thresholds")
 
-    return f"{speaker}: " + "; ".join(statements) + "."
+    if verbose:
+        return f"{speaker}: {', '.join(descriptors)}.", "\n".join(reasoning)
+    else:
+        return f"{speaker}: {', '.join(descriptors)}."
+
+def interpret_speaker_with_trends(emotional_dict, speaker, delta_thresh=0.6, inertia_thresh=0.75,
+                                  amp_thresh=1.1, align_thresh=0.6, contagion_thresh=0.6):
+    """
+    Returns overall descriptors + per-utterance trends for a speaker.
+    """
+    overall, reasoning = interpret_speaker(
+        emotional_dict,
+        speaker,
+        delta_thresh,
+        inertia_thresh,
+        amp_thresh,
+        align_thresh,
+        contagion_thresh,
+        verbose=True
+    )
+
+    trends = flag_trends(
+        emotional_dict,
+        speaker,
+        delta_thresh,
+        inertia_thresh,
+        amp_thresh,
+        align_thresh,
+        contagion_thresh
+    )
+
+    return {
+        "summary": overall,
+        "reasoning": reasoning,
+        "trends": trends
+    }
 
 def compute_scene_thresholds(
     emotional_dict,
@@ -613,22 +628,27 @@ def compute_scene_thresholds(
 
     return thresholds
 
-def generate_scene_summary(emotional_dict, speakers):
+def generate_scene_summary_with_trends(emotional_dict, speakers):
     thresholds = compute_scene_thresholds(emotional_dict, speakers)
-    summaries = []
+    summaries = {}
 
     for speaker in speakers:
-        statement = interpret_speaker(
+        result = interpret_speaker_with_trends(
             emotional_dict,
             speaker,
-            speakers,
             **thresholds
         )
-        print(statement)   
-        summaries.append(statement)
+        print(result["summary"])
+        print("Reasoning:")
+        print(result["reasoning"])
+        print("Per-utterance trends:")
+        for key, indices in result["trends"].items():
+            if indices:
+                print(f"  {key}: utterances {', '.join(str(i+1) for i in indices)}")
+        print("-"*50)
+        summaries[speaker] = result
 
     return summaries
-
 
 def plot_emotional_stability_map(emotional_dict, speakers):
     """
