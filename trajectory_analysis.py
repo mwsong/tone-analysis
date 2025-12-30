@@ -527,10 +527,10 @@ def flag_trends(emotional_dict, speaker, delta_thresh=0.6, inertia_thresh=0.75, 
     Returns a dictionary with per-utterance flags for trends in metrics.
     """
     trends = {
-        "volatility": [],
-        "reactive": [],
-        "accommodating": [],
-        "rigid": [],
+        "larger than usual shift": [],
+        "high response magnitude": [],
+        "high alignment between speakers": [],
+        "low change": [],
         "notable_shift": []
     }
 
@@ -545,17 +545,17 @@ def flag_trends(emotional_dict, speaker, delta_thresh=0.6, inertia_thresh=0.75, 
 
     for i in range(n):
         if deltas[i] > delta_thresh and inertia[i] < inertia_thresh:
-            trends["volatility"].append(i)
+            trends["larger than usual shift"].append(i)
 
         if i < len(amplifications) and amplifications[i] > amp_thresh and inertia[i] < inertia_thresh:
-            trends["reactive"].append(i)
+            trends["high response magnitude"].append(i)
 
         if i < len(alignments) and alignments[i] > align_thresh and i < len(contagions) and contagions[i] > contagion_thresh:
-            trends["accommodating"].append(i)
+            trends["high alignment between speakers"].append(i)
 
         if i < len(amplifications) and i < len(contagions) and inertia[i] > inertia_thresh \
            and amplifications[i] < amp_thresh and contagions[i] < contagion_thresh:
-            trends["rigid"].append(i)
+            trends["low change"].append(i)
 
         if deltas[i] > delta_thresh:
             trends["notable_shift"].append(i)
