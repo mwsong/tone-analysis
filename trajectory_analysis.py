@@ -163,7 +163,7 @@ def load_annotations_txt(file_path, speakers):
                 sp_utt, text = line.split(":", 1)
                 sp, utt = sp_utt.split(",", 1)
                 sp = sp.strip().lower()
-                utt = int(utt.strip()) - 1  # convert 1-based to 0-based
+                utt = int(utt.strip()) - 1  
                 annotations[sp][utt] = text.strip()
             except ValueError:
                 print(f"Skipping malformed line: {line}")
@@ -672,7 +672,7 @@ def compute_scene_thresholds(
     thresholds = {
         "delta_thresh": float(np.quantile(all_mean_deltas, delta_q)),
         "inertia_thresh": float(np.quantile(all_mean_inertias, inertia_q)),
-        "amp_thresh": float(cross["mean_amplification"]),   # single value → relative use
+        "amp_thresh": float(cross["mean_amplification"]),  
         "align_thresh": float(cross["mean_alignment"]),
         "contagion_thresh": float(cross["mean_contagion"]),
     }
