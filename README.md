@@ -27,6 +27,7 @@ Layers of Analysis:
 6. emotional inertia. how much change in emotional state is occurring within one speaker's responses. (cosine similarity between h[t] and h[t+1])
 
 Annotations: just my own subjective opinions on each utterance to compare to
+Spliced audio files with FL Studio
 
 # Interpretation 
 The results seem to capture some intuitive phenomena. The scene from Weapons was the most readable because the institutional and emotional stakes are explicit. The Weapons scene resulted in the most aligning results with my subjective interpretation. Other scenes did not align in any obvious ways at all, reinforcing the idea that more nuanced moods complicate quantitative interpretation. 
